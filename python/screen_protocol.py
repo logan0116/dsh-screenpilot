@@ -11,6 +11,7 @@ from PIL import ImageChops
 
 from ocr_locator import normalize
 from remote_screen import UnsupportedFeature
+from vnc_auth import PASSWORD_ENV, VncAuthError
 
 CODES = (
     "NO_CONNECTION",
@@ -185,6 +186,8 @@ class ScreenProtocol:
         """取画面并返回文字清单。"""
         try:
             image = self.remote.snapshot()
+        except VncAuthError as exc:
+            return self._fail("NO_CONNECTION", str(exc), f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
         except UnsupportedFeature as exc:
             return self._fail("UNSUPPORTED", str(exc),
                               "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
@@ -207,9 +210,11 @@ class ScreenProtocol:
         if before is None:
             try:
                 before = self.remote.snapshot()
+            except VncAuthError as exc:
+                return self._fail("NO_CONNECTION", str(exc), f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
             except UnsupportedFeature as exc:
                 return self._fail("UNSUPPORTED", str(exc),
-                                  "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
+                                  "编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
             except OSError as exc:
                 return self._fail("NO_CONNECTION", str(exc))
         before_ref = self._save(before, f"{kind}_before")
@@ -282,6 +287,8 @@ class ScreenProtocol:
         time.sleep(1.2)
         try:
             after = self.remote.snapshot()
+        except VncAuthError as exc:
+            return self._fail("NO_CONNECTION", str(exc), f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
         except UnsupportedFeature as exc:
             return self._fail("UNSUPPORTED", str(exc),
                               "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
@@ -374,9 +381,11 @@ class ScreenProtocol:
                 image = self.remote.snapshot(region=region)
             except ValueError as exc:
                 return self._fail("OUT_OF_BOUNDS", str(exc), "region 必须是画面内的 x0,y0,x1,y1")
+            except VncAuthError as exc:
+                return self._fail("NO_CONNECTION", str(exc), f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
             except UnsupportedFeature as exc:
                 return self._fail("UNSUPPORTED", str(exc),
-                                  "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
+                                  "编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
             except OSError as exc:
                 return self._fail("NO_CONNECTION", str(exc), "确认测试台在线且 VNC 端口可达")
             if prev is not None:

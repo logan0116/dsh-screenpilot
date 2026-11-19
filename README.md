@@ -67,6 +67,7 @@ dsh plugin --profile <profile> add "$PWD"
 | `pythonBin` | 见下 | 运行 sidecar 的解释器，需装有 requirements |
 | `defaultTarget` | `vnc://192.168.1.68:5900` | 会话文件缺失时的兜底目标 |
 | `timeoutMs` | `120000` | 单次 CLI 调用超时 |
+| `vncPassword` | 空 | 服务端要求 VNC Authentication 时的密码；经环境变量传给 sidecar，不进命令行 |
 
 `pythonBin` 的默认值按四级解析：显式配置 > `SCREENPILOT_PYTHON` > 包旁
 `.venv/bin/python`（存在才用）> `python3`。从源码目录安装时通常自动命中 `.venv`，
@@ -93,6 +94,10 @@ dsh plugin --profile <profile> add "$PWD"
 优先级：`screen_start` 的 `target` > 会话文件（最近一次成功的 `screen_start`）>
 配置 `defaultTarget` > 内置缺省。输出的 `screen.source` 会写明实际用的是哪一级
 （`target`/`session`/`default`/`builtin`），排查"连的是哪台台架"先看这个字段。
+
+服务端要求认证时（RFB 安全类型 2），客户端用 `vncPassword` 做 DES 质询-应答；
+没配密码或密码错误返回 `NO_CONNECTION` 并说明原因。认证依赖 `cryptography`
+（`pip install -r python/requirements.txt` 会装上）。
 
 目标格式只接受 `vnc://host[:port]`，端口缺省 5900。缺 scheme、host 为空、
 端口越界返回 `PROTOCOL_ERROR` 且不发起连接；非 `vnc` scheme 返回 `UNSUPPORTED`。

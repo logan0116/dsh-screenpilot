@@ -4,11 +4,14 @@
 新建连接才会触发重新抓屏。输入可以直接走新连接，坐标用的是
 framebuffer 绝对像素。
 """
+import os
 import socket
 import struct
 import time
 
 from PIL import Image
+
+from vnc_auth import PASSWORD_ENV, VncAuthError, VncAuthUnavailable, auth_response
 
 # ASCII 可打印区：X11 keysym 等于码位，可直接发送；下列符号在 US 布局上需要 Shift
 SHIFTED = {
@@ -34,13 +37,11 @@ class UnsupportedEncoding(UnsupportedFeature):
 
 
 class UnsupportedAuth(UnsupportedFeature):
-    """服务端要求认证，当前版本未实现（005-AR）。"""
+    """服务端提供的安全类型都不受支持。"""
 
     def __init__(self, types):
         self.types = list(types)
-        super().__init__(
-            f"服务端要求 VNC 认证（安全类型 {self.types}），当前版本未实现（005-AR）"
-        )
+        super().__init__(f"服务端的安全类型 {self.types} 均不受支持（支持 None 与 VNC Authentication）")
 
 
 class UnsupportedChar(ValueError):
@@ -60,6 +61,13 @@ class RemoteScreen:
     def _connect(self):
         s = socket.create_connection((self.host, self.port), 8)
         s.settimeout(25)
+        try:
+            return self._handshake(s)
+        except BaseException:
+            s.close()
+            raise
+
+    def _handshake(self, s):
 
         def rx(n):
             buf = b""
@@ -70,14 +78,20 @@ class RemoteScreen:
                 buf += chunk
             return buf
 
-        rx(12)
+        banner = rx(12)
+        self._version_38 = banner.startswith(b"RFB 003.008") or banner.startswith(b"RFB 003.007")
         s.sendall(b"RFB 003.008\n")
         count = rx(1)[0]
         types = list(rx(count))
-        if 1 not in types:
+        if 1 in types:                       # 安全类型 None：无认证
+            s.sendall(bytes([1]))
+            # RFB 3.8 在 None 之后仍有 4 字节 SecurityResult
+            if self._version_38:
+                rx(4)
+        elif 2 in types:                     # VNC Authentication
+            self._authenticate(s, rx)
+        else:
             raise UnsupportedAuth(types)
-        s.sendall(bytes([1]))
-        rx(4)
         s.sendall(bytes([1]))
         self.w, self.h = struct.unpack("!HH", rx(4))
         rx(16)
@@ -85,6 +99,34 @@ class RemoteScreen:
         self.name = rx(name_len).decode("latin-1")
         s.sendall(struct.pack("!BBH", 2, 0, 1) + struct.pack("!i", 0))
         return s, rx
+
+    def _authenticate(self, s, rx):
+        """安全类型 2：读 challenge、回 DES、读 SecurityResult。"""
+        password = os.environ.get(PASSWORD_ENV) or ""
+        if not password:
+            raise VncAuthError(
+                f"服务端要求 VNC 认证，但没有提供密码；设置环境变量 {PASSWORD_ENV} "
+                "或插件配置 vncPassword"
+            )
+        s.sendall(bytes([2]))
+        challenge = rx(16)
+        try:
+            response = auth_response(password, challenge)
+        except VncAuthUnavailable as exc:
+            raise VncAuthError(str(exc)) from exc
+        s.sendall(response)
+        result = struct.unpack("!I", rx(4))[0]
+        if result != 0:
+            reason = ""
+            try:
+                length = struct.unpack("!I", rx(4))[0]
+                if 0 < length <= 512:
+                    reason = rx(length).decode("utf-8", "replace")
+            except (OSError, EOFError, struct.error):
+                reason = ""
+            raise VncAuthError(
+                "VNC 认证失败（密码错误或服务端拒绝）" + (f"：{reason}" if reason else "")
+            )
 
     def _read_frame(self, s, rx, rect=None):
         """rect=(x0,y0,w,h) 只请求该矩形，返回 w×h 的图；缺省整屏。"""
