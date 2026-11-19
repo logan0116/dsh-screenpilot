@@ -3,6 +3,8 @@
 协议只负责原子能力：取画面、按文字定位、执行输入、断言、等待稳定。
 它不知道测试用例是什么，也不做用例判定。
 """
+import base64
+import io
 import os
 import time
 
@@ -365,6 +367,39 @@ class ScreenProtocol:
             return 1.0
         delta = np.abs(a - b).max(axis=2)
         return float((delta > 8).sum()) / float(delta.size or 1)
+
+    def frame(self, scale=0.5, quality=60):
+        """抓一帧供观察窗使用：降采样 + JPEG + base64。
+
+        不写证据文件——观察窗每秒都要一帧，落盘会写爆 evidence 目录。
+        """
+        try:
+            image = self.remote.snapshot()
+        except VncAuthError as exc:
+            return self._fail("NO_CONNECTION", str(exc),
+                              f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
+        except UnsupportedFeature as exc:
+            return self._fail("UNSUPPORTED", str(exc),
+                              "编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
+        except OSError as exc:
+            return self._fail("NO_CONNECTION", str(exc), "确认测试台在线且 VNC 端口可达")
+        self._last = image
+        width, height = image.size
+        try:
+            ratio = float(scale) if scale else 1.0
+        except (TypeError, ValueError):
+            ratio = 1.0
+        if 0 < ratio < 1:
+            image = image.resize((max(1, int(width * ratio)), max(1, int(height * ratio))))
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, "JPEG", quality=int(quality))
+        return self._envelope(True, None, {
+            "jpeg": base64.b64encode(buffer.getvalue()).decode(),
+            "w": image.width,
+            "h": image.height,
+            "scale": ratio,
+            "ts": int(time.time() * 1000),
+        })
 
     def settle(self, timeout=8.0, quiet=0.6, region=None, tolerance=0.002):
         """等到画面稳定。

@@ -7,14 +7,15 @@
   "exports": {
     ".": "./lib/index.js",
     "./dsh-plugin.json": "./dsh-plugin.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": "./lib/client.js"
   },
   "files": [
-    "lib/",
-    "python/",
     "assets/",
     "cordis.patch.yml",
-    "dsh-plugin.json"
+    "dsh-plugin.json",
+    "lib/",
+    "python/"
   ],
   "dsh": {
     "engines": {
@@ -22,6 +23,10 @@
     },
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
     }
   },
   "peerDependencies": {

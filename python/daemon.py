@@ -77,6 +77,8 @@ def _handle(sp, req):
             text=args.get("text"),
             region=tuple(region) if region else None,
         )
+    elif cmd == "frame":
+        result = sp.frame(scale=args.get("scale", 0.5), quality=args.get("quality", 60))
     elif cmd == "settle":
         region = args.get("region")
         result = sp.settle(
