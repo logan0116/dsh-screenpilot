@@ -131,10 +131,12 @@ dsh plugin --profile <profile> add "$PWD"
   常驻 sidecar 与跨调用帧缓存、`screen_stop`、`verify --kind url`、
   RFB 编码兼容与错误分类、ASCII 全键位输入与非 ASCII 拒绝；
   六个工具与实现一一对应，`screen.source`/`pid`/`cost` 可观测；
-- v0.2.1（代码已在 master，未发布）：解释器四级解析、常驻进程启动日志回传、
-  修复失败信封 `capture=null` 被输出校验拦掉（BUG-01）；
-- v0.3.0 待办：VNC 认证（005-AR，当前要求认证的服务端返回 `UNSUPPORTED`）；
-  协议自测的 12 条用例按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败，属已知的用例耦合；
+- v0.3.0（2026-11-19）：6 项落地——VNC Authentication（安全类型 2）、
+  解释器四级解析与启动日志回传、按键解析健壮性、`describe` 渲染元素清单、
+  `settle` 区域判稳与容差、组合键与输入法路径；并修复 BUG-01（失败信封
+  `capture=null` 被输出校验拦掉）。v0.2.1 未单独发布，内容并入本版；
+- 已知用例耦合：`protocol_selftest.py` 的 12 条按旧台架布局写死坐标，
+  台架画面变化后 P01–P06 会失败；
 - 侧边栏观察窗未做（需要 Client 侧代码）；
 - `web://` 后端未接入；
 - 图标与设置页为占位。
