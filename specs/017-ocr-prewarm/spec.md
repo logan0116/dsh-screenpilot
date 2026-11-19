@@ -20,3 +20,10 @@
 - 冷启动后立即 `describe`：总耗时仍含模型加载，但不会因超时失败；
 - 第二次 `describe` 明显更快；
 - `screen.pid` 稳定不变。
+
+## 实现与验证（2026-11-20）
+
+- daemon 启动即起后台线程预热 OCR（`threading.Thread(...).start()`），
+  每次回包带 `data.ocr_ready`。
+- 实测：spawn 后立即 `ping` → `ocr_ready=false`（0.11s）；3 秒后 → `true`；
+  首次 `describe` 正常返回 89 条文本，未因模型加载超时。

@@ -5,7 +5,9 @@
 import argparse
 import json
 import os
+import secrets
 import socket
+import threading
 import sys
 import sys
 
@@ -120,10 +122,43 @@ def serve(host, port, evidence, sock_path, idle_timeout):
         evidence,
         meta={"host": host, "port": port, "source": "daemon"},
     )
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    if os.path.exists(sock_path):
-        os.unlink(sock_path)
-    server.bind(sock_path)
+    # 传输层：有 AF_UNIX 且没被强制 TCP 时走 unix socket；
+    # 否则（Windows）绑本机随机端口，并把 {port,pid,token} 写进原 sock 路径，
+    # client 不需要额外配置。token 保证同机其它进程不能静默接管。
+    # OCR 预热：在后台线程里加载模型，避免首次 describe 把整个请求拖成超时。
+    # 预热失败不影响后续调用（真用到时还会再加载一次）。
+    ocr_state = {"ready": False}
+
+    def _prewarm():
+        try:
+            sp.locator.engine
+            ocr_state["ready"] = True
+        except Exception:  # noqa: BLE001 - 预热失败不应影响 daemon 启动
+            ocr_state["ready"] = False
+
+    threading.Thread(target=_prewarm, name="ocr-prewarm", daemon=True).start()
+
+    use_unix = hasattr(socket, "AF_UNIX") and os.environ.get("SCREENPILOT_TRANSPORT") != "tcp"
+    token = None
+    if use_unix:
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        if os.path.exists(sock_path):
+            os.unlink(sock_path)
+        server.bind(sock_path)
+    else:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", 0))
+        token = secrets.token_hex(16)
+        descriptor = {
+            "transport": "tcp",
+            "host": "127.0.0.1",
+            "port": server.getsockname()[1],
+            "pid": os.getpid(),
+            "token": token,
+        }
+        with open(sock_path, "w", encoding="utf-8") as fh:
+            json.dump(descriptor, fh)
     server.listen(8)
     server.settimeout(1.0)
     last_active = time.time()
@@ -150,7 +185,14 @@ def serve(host, port, evidence, sock_path, idle_timeout):
                         req = json.loads(buffer.decode() or "{}")
                     except json.JSONDecodeError:
                         req = {"cmd": "__bad__"}
+                    if token is not None and req.get("auth") != token:
+                        conn.sendall(json.dumps(
+                            {"ok": False, "error": {"code": "NO_CONNECTION",
+                                                    "message": "本地端口需要 token 认证"}},
+                            ensure_ascii=False).encode() + b"\n")
+                        continue
                     result = handle(sp, req)
+                    result.setdefault("data", {})["ocr_ready"] = ocr_state["ready"]
                     conn.sendall(json.dumps(result, ensure_ascii=False).encode() + b"\n")
             except OSError:
                 pass

@@ -32,3 +32,16 @@
 - 杀掉 daemon 留下端口文件 → 下次调用自动清理并重建。
 
 > 本需求无法在当前 Linux 环境自证，验收需同事在 Windows 回测。
+
+## 实现与验证（2026-11-20）
+
+- daemon：`AF_UNIX` 缺失或 `SCREENPILOT_TRANSPORT=tcp` 时绑 `127.0.0.1:0`，
+  写 `{transport,host,port,pid,token}` 到原 socket 路径；每条请求校验 `auth`。
+- client：`endpoint()` 读描述文件判别传输方式；TCP 模式连接时带 token；
+  残留描述文件先用 pid 探活，死进程直接清理。
+- 已在 Linux 上强制 `SCREENPILOT_TRANSPORT=tcp` 端到端验证：
+  - `ping` 0.15s 成功，描述文件内容正确（token 不打印）；
+  - 不带 token 连接被拒（`本地端口需要 token 认证`）；
+  - 带 token 连接成功。
+- **未验证**：真实 Windows 环境下的行为（无 AF_UNIX 的自动分支）。Linux 上是
+  用环境变量强制走的同一条代码路径，不能等价替代 Win32 socket 行为。
