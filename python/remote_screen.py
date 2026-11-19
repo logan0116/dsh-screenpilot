@@ -21,6 +21,14 @@ CONTROL = {"\n": 0xFF0D, "\t": 0xFF09}
 SHIFT = 0xFFE1
 
 
+class UnsupportedEncoding(RuntimeError):
+    """服务端使用了未实现的 RFB 编码。"""
+
+    def __init__(self, encoding):
+        self.encoding = encoding
+        super().__init__(f"服务端使用未实现的 RFB 编码：{encoding}")
+
+
 class UnsupportedChar(ValueError):
     """非 ASCII（或控制符）字符，当前输入通道无法表达。"""
 
@@ -85,12 +93,17 @@ class RemoteScreen:
             for _ in range(count):
                 x, y, w, h = struct.unpack("!HHHH", rx(8))
                 enc = struct.unpack("!i", rx(4))[0]
-                if enc != 0:
-                    raise RuntimeError(f"unsupported encoding {enc}")
-                data = rx(w * h * 4)
-                non_zero += sum(1 for b in data if b)
-                tile = Image.frombuffer("RGB", (w, h), data, "raw", "BGRX", 0, 1)
-                img.paste(tile, (x, y))
+                if enc == 0:  # Raw
+                    data = rx(w * h * 4)
+                    non_zero += sum(1 for b in data if b)
+                    tile = Image.frombuffer("RGB", (w, h), data, "raw", "BGRX", 0, 1)
+                    img.paste(tile, (x, y))
+                elif enc == 1:  # CopyRect：源矩形取自本帧已绘制区域
+                    sx, sy = struct.unpack("!HH", rx(4))
+                    tile = img.crop((sx, sy, sx + w, sy + h))
+                    img.paste(tile, (x, y))
+                else:
+                    raise UnsupportedEncoding(enc)
                 rows += h
         return img, non_zero
 

@@ -9,6 +9,7 @@ import time
 from PIL import ImageChops
 
 from ocr_locator import normalize
+from remote_screen import UnsupportedEncoding
 
 CODES = (
     "NO_CONNECTION",
@@ -83,6 +84,9 @@ class ScreenProtocol:
         """取画面并返回文字清单。"""
         try:
             image = self.remote.snapshot()
+        except UnsupportedEncoding as exc:
+            return self._fail("UNSUPPORTED", str(exc),
+                              "服务端启用了 Tight/ZRLE 等未实现编码，请在服务端关闭或改用 Raw/CopyRect")
         except OSError as exc:
             return self._fail("NO_CONNECTION", str(exc), "确认测试台在线且 VNC 端口可达")
         ref = self._save(image, "describe")
@@ -102,6 +106,9 @@ class ScreenProtocol:
         if before is None:
             try:
                 before = self.remote.snapshot()
+            except UnsupportedEncoding as exc:
+                return self._fail("UNSUPPORTED", str(exc),
+                                  "服务端启用了未实现编码，请在服务端关闭或改用 Raw/CopyRect")
             except OSError as exc:
                 return self._fail("NO_CONNECTION", str(exc))
         before_ref = self._save(before, f"{kind}_before")
@@ -162,6 +169,9 @@ class ScreenProtocol:
         time.sleep(1.2)
         try:
             after = self.remote.snapshot()
+        except UnsupportedEncoding as exc:
+            return self._fail("UNSUPPORTED", str(exc),
+                              "服务端启用了未实现编码，请在服务端关闭或改用 Raw/CopyRect")
         except OSError as exc:
             return self._fail("NO_CONNECTION", str(exc))
         after_ref = self._save(after, f"{kind}_after")
@@ -230,6 +240,9 @@ class ScreenProtocol:
         while time.time() < deadline:
             try:
                 image = self.remote.snapshot()
+            except UnsupportedEncoding as exc:
+                return self._fail("UNSUPPORTED", str(exc),
+                                  "服务端启用了未实现编码，请在服务端关闭或改用 Raw/CopyRect")
             except OSError as exc:
                 return self._fail("NO_CONNECTION", str(exc), "确认测试台在线且 VNC 端口可达")
             if prev is not None and image.tobytes() == prev.tobytes():
