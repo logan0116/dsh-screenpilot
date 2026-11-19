@@ -206,7 +206,7 @@ class ScreenProtocol:
         ]
         return self._envelope(True, ref, {"texts": texts, "region": region})
 
-    def act(self, kind, text=None, xy=None, region=None, **kwargs):
+    def act(self, kind, text=None, xy=None, region=None, wait=0.6, retry_on_no_change=False, **kwargs):
         """执行一个输入动作，返回动作前后两帧证据。"""
         before = self._last
         if before is None:
@@ -286,9 +286,33 @@ class ScreenProtocol:
         except OSError as exc:
             return self._fail("NO_CONNECTION", str(exc))
 
-        time.sleep(1.2)
+        # 自适应等待：先短暂等待取一帧；若与动作前帧几乎无差异，
+        # 说明可能还没重绘，再补一帧并保留变化更大者。最坏仍是两次抓帧。
+        def settle_after():
+            time.sleep(max(0.0, float(wait)))
+            shot = self.remote.snapshot()
+            shot_ref = self._save(shot, f"{kind}_after")
+            retried = False
+            if retry_on_no_change and before is not None:
+                try:
+                    ratio = self._changed_ratio(shot, before)
+                except ValueError:
+                    ratio = 1.0
+                if ratio <= 0.0005:
+                    time.sleep(0.5)
+                    second = self.remote.snapshot()
+                    second_ref = self._save(second, f"{kind}_after2")
+                    retried = True
+                    try:
+                        keep_second = self._changed_ratio(second, before) > ratio
+                    except ValueError:
+                        keep_second = True
+                    if keep_second:
+                        shot, shot_ref = second, second_ref
+            return shot, shot_ref, retried
+
         try:
-            after = self.remote.snapshot()
+            after, after_ref, retried = settle_after()
         except VncAuthError as exc:
             return self._fail("NO_CONNECTION", str(exc), f"设置 {PASSWORD_ENV} 或插件配置 vncPassword；确认密码与服务端一致")
         except UnsupportedFeature as exc:
@@ -296,11 +320,12 @@ class ScreenProtocol:
                               "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
         except OSError as exc:
             return self._fail("NO_CONNECTION", str(exc))
-        after_ref = self._save(after, f"{kind}_after")
         self._prev = before
         self._last = after
 
-        data = {"before": before_ref, "after": after_ref}
+        data = {"before": before_ref, "after": after_ref, "wait": wait}
+        if retried:
+            data["retried"] = True
         if target:
             data["target"] = target
         if len(candidates) > 1:

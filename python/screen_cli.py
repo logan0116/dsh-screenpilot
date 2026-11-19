@@ -66,7 +66,8 @@ def execute(args, host, port, region):
     xy = [int(v) for v in args.xy.split(",")] if args.xy else None
     return client.request(
         host, port, EVIDENCE, "act",
-        {"kind": args.kind, "text": args.text, "xy": xy, "region": region, "dy": args.dy},
+        {"kind": args.kind, "text": args.text, "xy": xy, "region": region, "dy": args.dy,
+         "wait": args.wait, "retry_on_no_change": args.retry_on_no_change},
     )
 
 
@@ -84,6 +85,8 @@ def main(argv=None):
     parser.add_argument("--dy", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=8.0)
     parser.add_argument("--tolerance", type=float, default=0.002)
+    parser.add_argument("--wait", type=float, default=0.6)
+    parser.add_argument("--retry-on-no-change", action="store_true")
     args = parser.parse_args(argv)
 
     try:

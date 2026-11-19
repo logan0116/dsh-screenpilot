@@ -69,6 +69,8 @@ def _handle(sp, req):
             xy=tuple(args["xy"]) if args.get("xy") else None,
             region=tuple(args["region"]) if args.get("region") else None,
             dy=args.get("dy", 3),
+            wait=args.get("wait", 0.6),
+            retry_on_no_change=bool(args.get("retry_on_no_change", False)),
         )
     elif cmd == "verify":
         region = args.get("region")
