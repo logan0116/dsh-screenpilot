@@ -1,0 +1,11 @@
+# 证据截图、缓存与本地产物不进包
+python/evidence/
+**/__pycache__/
+**/*.pyc
+.tmp-*/
+.tmp-*.json
+.tmp-npm/
+.evidence-test/
+dsh-screenpilot-*.tgz
+node_modules/
+.venv/

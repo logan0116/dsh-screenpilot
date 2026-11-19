@@ -11,11 +11,12 @@
     "./client": "./lib/client.js"
   },
   "files": [
+    "lib/",
+    "python/*.py",
+    "python/requirements.txt",
     "assets/",
     "cordis.patch.yml",
-    "dsh-plugin.json",
-    "lib/",
-    "python/"
+    "dsh-plugin.json"
   ],
   "dsh": {
     "engines": {
