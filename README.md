@@ -69,9 +69,26 @@ dsh plugin --profile <profile> add "$PWD"
 | `timeoutMs` | `120000` | 单次 CLI 调用超时 |
 | `vncPassword` | 空 | 服务端要求 VNC Authentication 时的密码；经环境变量传给 sidecar，不进命令行 |
 
-`pythonBin` 的默认值按四级解析：显式配置 > `SCREENPILOT_PYTHON` > 包旁
-`.venv/bin/python`（存在才用）> `python3`。从源码目录安装时通常自动命中 `.venv`，
-其它机器请先 `pip install -r python/requirements.txt` 或设 `SCREENPILOT_PYTHON`。
+`pythonBin` 的默认值按四级解析：显式配置 > `SCREENPILOT_PYTHON` > 包旁 venv >
+`python3`。包旁 venv 同时探测 POSIX 的 `.venv/bin/python` 与 Windows 的
+`.venv/Scripts/python.exe`。其它机器请先 `pip install -r python/requirements.txt`
+或设 `SCREENPILOT_PYTHON`。
+
+## Windows
+
+- 传输层自动回退：没有 `AF_UNIX` 时 sidecar 绑 `127.0.0.1` 随机端口，
+  并把 `{transport,port,pid,token}` 写到原 socket 路径；连接必须带一次性 token，
+  同机其它进程不能静默接管。
+- 解释器：uv 装的 Python 常常不向 `py` launcher 注册，`py -3` 会报
+  `No suitable Python runtime found`。直接用 venv 的绝对路径最稳：
+
+  ```yaml
+  pythonBin: C:\path\to\dsh-screenpilot\.venv\Scripts\python.exe
+  ```
+- 编码：插件已内置 `PYTHONUTF8=1` 与标准流 `reconfigure(utf-8)`，中文 Windows
+  的 GBK 代码页不再导致信封乱码。
+- 首调耗时：sidecar 启动后会在后台预热 OCR，但第一次 `describe` 仍可能数秒到
+  十数秒；这是模型推理本身，不是连接卡死。
 
 环境变量 `SCREENPILOT_EVIDENCE` 指定截图目录，默认写到 `python/evidence/`；
 `SCREENPILOT_STATE` 指定会话文件，默认 `~/.cache/screenpilot/session.json`；
