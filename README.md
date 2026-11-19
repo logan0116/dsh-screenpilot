@@ -52,7 +52,20 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
 | `timeoutMs` | `120000` | 单次 CLI 调用超时 |
 
 环境变量 `SCREENPILOT_EVIDENCE` 指定截图目录，默认写到 `python/evidence/`；
-`SCREENPILOT_STATE` 指定会话文件，默认 `~/.cache/screenpilot/session.json`。
+`SCREENPILOT_STATE` 指定会话文件，默认 `~/.cache/screenpilot/session.json`；
+`SCREENPILOT_IDLE` 指定常驻进程空闲退出秒数，默认 600。
+
+## 常驻会话
+
+每个目标（`host:port`）对应一个常驻 python 进程，通过 Unix domain socket 通信，
+首个调用时按需拉起。好处是跨调用保留最近两帧（`verify --kind changed` 因此可用）、
+`act` 的 `before` 直接复用上一帧、OCR 模型只加载一次。
+
+- socket 与日志在 `SCREENPILOT_STATE` 同目录：`daemon-<host>-<port>.sock` 与 `.sock.log`；
+- 空闲超过 `SCREENPILOT_IDLE` 秒自动退出并清理 socket；
+- 进程崩了或残留 socket，下次调用会清理并重新拉起；
+- 内部命令 `shutdown` 用于主动关停（工具层 `screen_stop` 见 003）；
+- Windows 暂不支持 Unix domain socket，常驻会话不可用（返回 `NO_CONNECTION`）。
 
 ## 目标解析
 
@@ -75,6 +88,7 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
 
 - v0.1.0：VNC 后端可用，六个工具与协议自测 12/12 通过；
 - v0.2.0（进行中）：`target` 真正生效（四级优先级 + 会话文件），`screen.source` 可诊断；
+  常驻 sidecar 与跨调用帧缓存已就位（`screen.pid`/`cost` 可观测）；
   协议自测的 12 条用例按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败，属已知的用例耦合；
 - 侧边栏观察窗未做（需要 Client 侧代码）；
 - `web://` 后端未接入；

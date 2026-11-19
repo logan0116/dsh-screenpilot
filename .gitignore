@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 evidence/
 *.log
+.tmp-*/
+.tmp-*.json
