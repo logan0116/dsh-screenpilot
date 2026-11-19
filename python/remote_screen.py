@@ -21,12 +21,26 @@ CONTROL = {"\n": 0xFF0D, "\t": 0xFF09}
 SHIFT = 0xFFE1
 
 
-class UnsupportedEncoding(RuntimeError):
+class UnsupportedFeature(RuntimeError):
+    """服务端要求的能力当前未实现（编码/认证）。"""
+
+
+class UnsupportedEncoding(UnsupportedFeature):
     """服务端使用了未实现的 RFB 编码。"""
 
     def __init__(self, encoding):
         self.encoding = encoding
         super().__init__(f"服务端使用未实现的 RFB 编码：{encoding}")
+
+
+class UnsupportedAuth(UnsupportedFeature):
+    """服务端要求认证，当前版本未实现（005-AR）。"""
+
+    def __init__(self, types):
+        self.types = list(types)
+        super().__init__(
+            f"服务端要求 VNC 认证（安全类型 {self.types}），当前版本未实现（005-AR）"
+        )
 
 
 class UnsupportedChar(ValueError):
@@ -61,7 +75,7 @@ class RemoteScreen:
         count = rx(1)[0]
         types = list(rx(count))
         if 1 not in types:
-            raise RuntimeError(f"server needs authentication: {types}")
+            raise UnsupportedAuth(types)
         s.sendall(bytes([1]))
         rx(4)
         s.sendall(bytes([1]))

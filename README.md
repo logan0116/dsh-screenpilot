@@ -86,10 +86,11 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
 
 ## 当前状态
 
-- v0.1.0：VNC 后端可用，六个工具与协议自测 12/12 通过；
-- v0.2.0（进行中）：`target` 真正生效（四级优先级 + 会话文件），`screen.source` 可诊断；
-  常驻 sidecar 与跨调用帧缓存已就位（`screen.pid`/`cost` 可观测）；
-  `screen_stop` 已实现，六个工具与实现一一对应；
+- v0.2.0（2026-11-19）：6 项需求落地——`target` 四级优先级与会话文件、
+  常驻 sidecar 与跨调用帧缓存、`screen_stop`、`verify --kind url`、
+  RFB 编码兼容与错误分类、ASCII 全键位输入与非 ASCII 拒绝；
+  六个工具与实现一一对应，`screen.source`/`pid`/`cost` 可观测；
+- v0.3.0 待办：VNC 认证（005-AR，当前要求认证的服务端返回 `UNSUPPORTED`）；
   协议自测的 12 条用例按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败，属已知的用例耦合；
 - 侧边栏观察窗未做（需要 Client 侧代码）；
 - `web://` 后端未接入；
