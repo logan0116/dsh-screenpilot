@@ -69,6 +69,20 @@ KEY_ALIASES = {
 }
 
 
+# 修饰键：组合键语法 ctrl+shift+s 里的前缀名
+MODIFIER_KEYSYM = {
+    "ctrl": 0xFFE3,
+    "control": 0xFFE3,
+    "alt": 0xFFE9,
+    "option": 0xFFE9,
+    "shift": 0xFFE1,
+    "meta": 0xFFEB,
+    "win": 0xFFEB,
+    "super": 0xFFEB,
+    "cmd": 0xFFEB,
+}
+
+
 def resolve_keysym(name):
     """把按键名解析成 keysym；无法识别返回 None（调用方负责报 PROTOCOL_ERROR）。
 
@@ -85,6 +99,42 @@ def resolve_keysym(name):
     if len(key) == 1 and 0x20 <= ord(key) <= 0x7E:
         return ord(key)
     return None
+
+
+def parse_combo(text):
+    """解析组合键，返回 (修饰键 keysym 列表, 主键 keysym)。
+
+    语法：mod[+mod...]+key，例如 ctrl+space / alt+f4 / ctrl+shift+s。
+    校验在发送前完成，任何一项非法都抛 ValueError，不产生副作用。
+    """
+    raw = (text or "").strip().lower()
+    if not raw:
+        raise ValueError("组合键为空")
+    tokens = [t for t in raw.split("+")]
+    if any(not t for t in tokens):
+        raise ValueError(f"组合键里有空的键位：{text!r}")
+    # 单独的修饰键名是合法按键（例如 shift 切换中英文），不能当成"缺主键"
+    if len(tokens) == 1 and tokens[0] in MODIFIER_KEYSYM:
+        return [], MODIFIER_KEYSYM[tokens[0]]
+    modifiers = []
+    keys = []
+    for token in tokens:
+        if token in MODIFIER_KEYSYM:
+            modifiers.append(MODIFIER_KEYSYM[token])
+        else:
+            keys.append(token)
+    if len(keys) != 1:
+        raise ValueError(f"组合键只能有一个主键，收到 {keys}")
+    keysym = resolve_keysym(keys[0])
+    if keysym is None:
+        raise ValueError(f"不支持的按键 {keys[0]!r}")
+    if not modifiers and len(tokens) > 1:
+        raise ValueError(f"没有识别到修饰键：{text!r}")
+    return modifiers, keysym
+
+
+def supported_modifiers():
+    return ", ".join(sorted({m for m in MODIFIER_KEYSYM}))
 
 
 def supported_key_names():
@@ -206,14 +256,19 @@ class ScreenProtocol:
             elif kind == "type":
                 self.remote.type_text(text or "")
             elif kind == "key":
-                keysym = resolve_keysym(text)
-                if keysym is None:
+                try:
+                    modifiers, keysym = parse_combo(text)
+                except ValueError as exc:
                     return self._fail(
                         "PROTOCOL_ERROR",
-                        f"不支持的按键 {text!r}",
-                        f"可用按键：{supported_key_names()}；也支持单个可打印 ASCII 字符",
+                        str(exc),
+                        f"可用修饰键：{supported_modifiers()}；可用按键：{supported_key_names()}；"
+                        "也支持单个可打印 ASCII 字符。组合键写法如 ctrl+space、alt+f4、ctrl+shift+s",
                     )
-                self.remote.tap(keysym)
+                if modifiers:
+                    self.remote.key_combo(modifiers, keysym)
+                else:
+                    self.remote.tap(keysym)
             elif kind == "scroll":
                 dy = kwargs.get("dy", 0)
                 cx = target["x"] if target else self.remote.w // 2

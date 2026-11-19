@@ -97,6 +97,21 @@ dsh plugin --profile <profile> add "$PWD"
 目标格式只接受 `vnc://host[:port]`，端口缺省 5900。缺 scheme、host 为空、
 端口越界返回 `PROTOCOL_ERROR` 且不发起连接；非 `vnc` scheme 返回 `UNSUPPORTED`。
 
+## 组合键与输入法
+
+`screen_act(kind=key, value=...)` 支持组合键：`ctrl+space`、`alt+f4`、`ctrl+shift+s`；
+也支持单按修饰键（`shift`）。解析与校验在发送前完成，未知修饰键或主键返回
+`PROTOCOL_ERROR` 且不产生任何输入。
+
+```text
+可用修饰键：alt / cmd / control / ctrl / meta / option / shift / super / win
+```
+
+**中文输入法下的 `type` 不可靠**：工具只能发 ASCII keysym，输入法会把它们当拼音
+组合（实测 `abc` 可能上屏成汉字候选）。正确做法是先用组合键把输入法切到英文
+（常见 `shift`、`ctrl+space`、`win+space`，取决于机器配置），再 `type`，
+并且用 `screen_verify` 回读一次确认原文真的落屏。中文/emoji 输入仍不支持（返回 `UNSUPPORTED`）。
+
 ## 协议
 
 工具语义遵循 rsp/2：统一信封、封闭错误码（`NO_CONNECTION`、`NOT_STARTED`、

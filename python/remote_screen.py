@@ -173,6 +173,22 @@ class RemoteScreen:
 
         self._run(action)
 
+    def key_combo(self, modifiers, keysym):
+        """按修饰键 → 主键 → 逆序抬起 的顺序发一个组合键，全程单连接。"""
+        def action(s):
+            for mod in modifiers:
+                s.sendall(struct.pack("!BBHI", 4, 1, 0, mod))
+                time.sleep(0.03)
+            s.sendall(struct.pack("!BBHI", 4, 1, 0, keysym))
+            time.sleep(0.05)
+            s.sendall(struct.pack("!BBHI", 4, 0, 0, keysym))
+            time.sleep(0.03)
+            for mod in reversed(modifiers):
+                s.sendall(struct.pack("!BBHI", 4, 0, 0, mod))
+                time.sleep(0.03)
+
+        self._run(action)
+
     def tap(self, keysym):
         def action(s):
             s.sendall(struct.pack("!BBHI", 4, 1, 0, keysym))
