@@ -8,6 +8,8 @@ import time
 
 from PIL import ImageChops
 
+from ocr_locator import normalize
+
 CODES = (
     "NO_CONNECTION",
     "NOT_STARTED",
@@ -158,8 +160,13 @@ class ScreenProtocol:
             data["candidates"] = candidates
         return self._envelope(True, after_ref, data)
 
+    @staticmethod
+    def _url_core(value):
+        """URL 归一化：去空白、全角转半角、小写、去 scheme。"""
+        return normalize(value or "").lower().removeprefix("https://").removeprefix("http://")
+
     def verify(self, kind="text", text=None, region=None, min_diff=500):
-        """断言。kind: text / absent / changed / same。"""
+        """断言。kind: text / absent / url / changed / same。"""
         image = self._last
         if image is None:
             got = self.describe()
@@ -173,6 +180,23 @@ class ScreenProtocol:
         if kind == "absent":
             pos = self.locator.find(image, text, region=region)
             return self._envelope(True, ref, {"kind": kind, "text": text, "absent": pos is None})
+        if kind == "url":
+            want = self._url_core(text)
+            if not want:
+                return self._fail("PROTOCOL_ERROR", "url 断言需要 value", "传 URL 片段，如 192.168.1.155:8090")
+            seen = self.locator.scan(image, region) if region else self.locator.scan(image)
+            hits = [t for t, _x, _y, _s in seen if want in self._url_core(t)]
+            if hits:
+                return self._envelope(True, ref, {"kind": kind, "text": text, "satisfied": True, "hits": hits[:3]})
+            # 画面里根本没有 URL 形态文本：vnc 后端无从判断地址栏，交回 UNSUPPORTED
+            if not any("://" in t for t, _x, _y, _s in seen):
+                return self._fail(
+                    "UNSUPPORTED",
+                    f"画面中没有可识别的地址栏或 URL 文本，无法断言「{text}」",
+                    "vnc 后端只能按画面文字判断；确认地址栏可见，或改用 kind=text",
+                )
+            return self._envelope(True, ref, {"kind": kind, "text": text, "satisfied": False})
+
         if kind == "changed":
             prev = getattr(self, "_prev", None)
             if prev is None:
