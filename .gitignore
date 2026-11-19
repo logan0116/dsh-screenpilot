@@ -6,3 +6,4 @@ evidence/
 *.log
 .tmp-*/
 .tmp-*.json
+.evidence-test/

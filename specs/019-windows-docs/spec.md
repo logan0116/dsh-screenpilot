@@ -19,3 +19,10 @@
 
 - Linux 上 `.venv/bin/python` 探测不回归；
 - 文档条目逐条对照同事反馈的 9 条。
+
+## 实现与验证（2026-11-20）
+
+- `defaultPython()` 探测列表补 Windows venv：`.venv/Scripts/python.exe`。
+- README 新增 Windows 小节（传输层回退与 token、`pythonBin` 绝对路径示例、
+  内置 UTF-8、首调耗时预期）。
+- 验证：Linux 上探测仍命中 `.venv/bin/python`（`Config({}).pythonBin` 输出确认）。
