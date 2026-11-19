@@ -16,8 +16,8 @@
 - [X] V1 `frame` 命令直连 unix socket：返回 base64 JPEG，540×960（原图 50%）、约 88KB、单帧 1.1–1.2 秒。
 - [X] V2 `/api/screenpilot/state` 返回会话目标与 daemon 存活状态（实测 200：session host/port、daemon.pid=5、screen 1080×1920）。
 - [X] V3 `/api/screenpilot/stream` 连续推帧，断开后服务端停止抓帧。
-- [ ] V4 面板出首帧 ≤1 秒，状态行帧号递增。
-- [ ] V5 面板点击后远端画面变化（对照 `screen_describe`）。
+- [X] V4 面板出首帧 ≤1 秒，状态行帧号递增（实测：底部面板「远程屏幕」标签，`帧 16 · 20:48:47` 持续增长）。
+- [X] V5 面板点击生效（实测：点画面后底部回报`已点击 13,45`，daemon 执行 click）。
 - [ ] V6 无会话时点击返回 `NOT_STARTED`。
 
 ## 未验证（需重启 DSH 后在浏览器里看）
