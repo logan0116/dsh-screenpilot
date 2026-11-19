@@ -1,0 +1,6 @@
+# Insert screenpilot: screen_* tools that drive a remote test bench over VNC/RFB
+# or a browser through the web backend. Python sidecar carries RFB, OCR and the
+# rsp/2 protocol; this entry only adapts them to model-facing tools.
+- insert:
+    - id: screenpilot
+      name: "dsh-screenpilot"

@@ -1,0 +1,33 @@
+{
+  "name": "dsh-screenpilot",
+  "version": "0.1.0",
+  "description": "Agent 屏幕驾驶员：把远程测试台与浏览器的屏幕操控封装成 screen_* 工具，附带实时观察窗。",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./dsh-plugin.json": "./dsh-plugin.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/",
+    "python/",
+    "assets/",
+    "cordis.patch.yml",
+    "dsh-plugin.json"
+  ],
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.2.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0",
+    "@deepseek-ai/schemastery": ">=0.2.0"
+  },
+  "license": "MIT"
+}
