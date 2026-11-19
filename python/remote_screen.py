@@ -215,6 +215,20 @@ class RemoteScreen:
 
         self._run(action)
 
+    def set_clipboard(self, text):
+        """RFB ClientCutText（消息类型 6）：把文本写进远端剪贴板。
+
+        协议只规定 Latin-1；实际服务端多按 UTF-8 处理，这里发 UTF-8 字节。
+        写入远端剪贴板属副作用：会覆盖用户原本的剪贴板内容。
+        """
+        payload = (text or "").encode("utf-8")
+        message = struct.pack("!BxxxI", 6, len(payload)) + payload
+
+        def action(sock):
+            sock.sendall(message)
+
+        self._run(action)
+
     def key_combo(self, modifiers, keysym):
         """按修饰键 → 主键 → 逆序抬起 的顺序发一个组合键，全程单连接。"""
         def action(s):

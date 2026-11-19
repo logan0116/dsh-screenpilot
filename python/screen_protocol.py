@@ -256,21 +256,35 @@ class ScreenProtocol:
                 f"坐标 ({target['x']},{target['y']}) 超出 {self.remote.w}x{self.remote.h}",
             )
 
+        clipboard_paste = False
         if kind == "type":
+            mode = kwargs.get("input_mode", "auto")
+            if mode not in ("auto", "keysym", "clipboard"):
+                return self._fail("PROTOCOL_ERROR", f"未知 input_mode={mode!r}", "auto / keysym / clipboard")
             bad = next((c for c in (text or "") if (ord(c) > 0x7E or ord(c) < 0x20)
                         and c not in "\n\t"), None)
-            if bad is not None:
-                return self._fail(
-                    "UNSUPPORTED",
-                    f"非 ASCII 字符 {bad!r} (U+{ord(bad):04X}) 无法输入",
-                    "当前输入通道只支持 ASCII；中文等需剪贴板注入（另立需求）",
-                )
+            if mode == "clipboard":
+                clipboard_paste = True
+            elif bad is not None:
+                if mode == "keysym":
+                    return self._fail(
+                        "UNSUPPORTED",
+                        f"非 ASCII 字符 {bad!r} (U+{ord(bad):04X}) 无法用键盘输入",
+                        "改用 input_mode=auto 走剪贴板粘贴，或把内容改成 ASCII",
+                    )
+                clipboard_paste = True
 
         try:
             if kind == "click":
                 self.remote.click(target["x"], target["y"])
             elif kind == "type":
-                self.remote.type_text(text or "")
+                if clipboard_paste:
+                    self.remote.set_clipboard(text or "")
+                    time.sleep(0.15)
+                    self.remote.key_combo([0xFFE3], ord("v"))   # Ctrl+V
+                    time.sleep(0.15)
+                else:
+                    self.remote.type_text(text or "")
             elif kind == "key":
                 try:
                     modifiers, keysym = parse_combo(text)
@@ -333,6 +347,8 @@ class ScreenProtocol:
         self._last = after
 
         data = {"before": before_ref, "after": after_ref, "wait": wait}
+        if kind == "type":
+            data["input_mode"] = "clipboard" if clipboard_paste else "keysym"
         if retried:
             data["retried"] = True
         if target:

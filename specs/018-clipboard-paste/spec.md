@@ -23,3 +23,17 @@ RFB 协议有 `ClientCutText`（消息类型 6），可以把文本写到远端�
 
 - 中文串粘贴后 `describe` 回读一致；
 - 断开/不支持 `ClientCutText` 的服务端返回 `UNSUPPORTED`。
+
+## 实现与验证（2026-11-20）
+
+- `RemoteScreen.set_clipboard()` 发送 RFB `ClientCutText`（类型 6，3 字节填充 + 4 字节长度 + UTF-8 正文）。
+- `act(kind=type)` 按 `input_mode` 分流：`auto`（默认，非 ASCII 走剪贴板）、`keysym`（维持 007 行为）、`clipboard`（强制）。
+- 剪贴板路径：写远端剪贴板 → 等 0.15s → `Ctrl+V` → 等 0.15s 取帧。
+- `data.input_mode` 标明实际通道；未知取值返回 `PROTOCOL_ERROR`。
+- 单测 `test_clipboard_input.py` 6 条：默认分流、ASCII 仍走键盘、`keysym` 拒绝非 ASCII、显式 clipboard、未知 mode、`ClientCutText` 字节布局。
+
+## 未验证（有意不做）
+
+- **没有在真机上粘贴中文**。68 号机是活的数控 HMI，`Ctrl+V` 的落点取决于当前焦点，
+  一旦粘进参数输入框就是改动现场配置；这一条留给同事在安全的测试工件上验。
+- 某些服务端只接受 Latin-1 的 `ClientCutText`，UTF-8 字节可能被拒或乱码，未覆盖。

@@ -77,7 +77,8 @@ def execute(args, host, port, region):
     return client.request(
         host, port, EVIDENCE, "act",
         {"kind": args.kind, "text": args.text, "xy": xy, "region": region, "dy": args.dy,
-         "wait": args.wait, "retry_on_no_change": args.retry_on_no_change},
+         "wait": args.wait, "retry_on_no_change": args.retry_on_no_change,
+         "input_mode": args.input_mode},
     )
 
 
@@ -98,6 +99,7 @@ def main(argv=None):
     parser.add_argument("--wait", type=float, default=0.6)
     parser.add_argument("--mode", default="precise", choices=["precise", "fast"])
     parser.add_argument("--retry-on-no-change", action="store_true")
+    parser.add_argument("--input-mode", default="auto", choices=["auto", "keysym", "clipboard"])
     args = parser.parse_args(argv)
 
     try:

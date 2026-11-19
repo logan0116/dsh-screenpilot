@@ -86,6 +86,7 @@ def _handle(sp, req):
             dy=args.get("dy", 3),
             wait=args.get("wait", 0.6),
             retry_on_no_change=bool(args.get("retry_on_no_change", False)),
+            input_mode=args.get("input_mode", "auto"),
         )
     elif cmd == "verify":
         region = args.get("region")
