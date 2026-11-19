@@ -7,6 +7,16 @@ import json
 import os
 import socket
 import sys
+import sys
+
+# 中文 Windows 默认代码页是 GBK：子进程经管道输出会被按 GBK 编码，
+# Node 侧按 UTF-8 解码就全是乱码。这里强制标准流为 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            pass
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -125,19 +135,25 @@ def serve(host, port, evidence, sock_path, idle_timeout):
                 if time.time() - last_active > idle_timeout:
                     break
                 continue
-            with conn:
-                buffer = b""
-                while not buffer.endswith(b"\n"):
-                    chunk = conn.recv(65536)
-                    if not chunk:
-                        break
-                    buffer += chunk
-                try:
-                    req = json.loads(buffer.decode() or "{}")
-                except json.JSONDecodeError:
-                    req = {"cmd": "__bad__"}
-                result = handle(sp, req)
-                conn.sendall(json.dumps(result, ensure_ascii=False).encode() + b"\n")
+            # 单连接异常（客户端超时/断开）不得带崩常驻进程：
+            # 否则一次工具超时就会杀掉 daemon，下次调用重新冷加载 OCR（Windows 上 >10s）。
+            req = {}
+            try:
+                with conn:
+                    buffer = b""
+                    while not buffer.endswith(b"\n"):
+                        chunk = conn.recv(65536)
+                        if not chunk:
+                            break
+                        buffer += chunk
+                    try:
+                        req = json.loads(buffer.decode() or "{}")
+                    except json.JSONDecodeError:
+                        req = {"cmd": "__bad__"}
+                    result = handle(sp, req)
+                    conn.sendall(json.dumps(result, ensure_ascii=False).encode() + b"\n")
+            except OSError:
+                pass
             last_active = time.time()
             if req.get("cmd") in ("stop", "shutdown"):
                 break

@@ -7,6 +7,16 @@ import argparse
 import json
 import os
 import sys
+import sys
+
+# 中文 Windows 默认代码页是 GBK：子进程经管道输出会被按 GBK 编码，
+# Node 侧按 UTF-8 解码就全是乱码。这里强制标准流为 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            pass
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
