@@ -47,9 +47,13 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `pythonBin` | `python3` | 运行 sidecar 的解释器，需装有 requirements |
+| `pythonBin` | 见下 | 运行 sidecar 的解释器，需装有 requirements |
 | `defaultTarget` | `vnc://192.168.1.68:5900` | 会话文件缺失时的兜底目标 |
 | `timeoutMs` | `120000` | 单次 CLI 调用超时 |
+
+`pythonBin` 的默认值按四级解析：显式配置 > `SCREENPILOT_PYTHON` > 包旁
+`.venv/bin/python`（存在才用）> `python3`。从源码目录安装时通常自动命中 `.venv`，
+其它机器请先 `pip install -r python/requirements.txt` 或设 `SCREENPILOT_PYTHON`。
 
 环境变量 `SCREENPILOT_EVIDENCE` 指定截图目录，默认写到 `python/evidence/`；
 `SCREENPILOT_STATE` 指定会话文件，默认 `~/.cache/screenpilot/session.json`；
@@ -90,6 +94,7 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
   常驻 sidecar 与跨调用帧缓存、`screen_stop`、`verify --kind url`、
   RFB 编码兼容与错误分类、ASCII 全键位输入与非 ASCII 拒绝；
   六个工具与实现一一对应，`screen.source`/`pid`/`cost` 可观测；
+- v0.2.1（待验收）：解释器四级解析与常驻进程启动日志回传，装完即可用；
 - v0.3.0 待办：VNC 认证（005-AR，当前要求认证的服务端返回 `UNSUPPORTED`）；
   协议自测的 12 条用例按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败，属已知的用例耦合；
 - 侧边栏观察窗未做（需要 Client 侧代码）；

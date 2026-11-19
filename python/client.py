@@ -62,6 +62,20 @@ def _spawn(host, port, path, evidence):
         )
 
 
+def _log_tail(path, limit=400):
+    """把 daemon 日志最后几行带进错误信息，避免"超时"掩盖 ModuleNotFoundError。"""
+    try:
+        with open(f"{path}.log", "rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - limit))
+            text = fh.read().decode("utf-8", "replace").strip()
+    except OSError:
+        return "无日志"
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return "log: " + " | ".join(lines[-3:]) if lines else "无日志"
+
+
 def ensure(host, port, evidence):
     """返回一个已连接的 socket；必要时拉起常驻进程。"""
     path = socket_path(host, port)
@@ -92,7 +106,9 @@ def ensure(host, port, evidence):
             sock = _connect(path)
             if sock is not None:
                 return sock
-    raise DaemonError(f"常驻进程启动超时（{SPAWN_TIMEOUT}s），见 {path}.log")
+    raise DaemonError(
+        f"常驻进程启动超时（{SPAWN_TIMEOUT}s）：{_log_tail(path)}"
+    )
 
 
 def request(host, port, evidence, cmd, args=None, spawn=True):
@@ -118,5 +134,5 @@ def request(host, port, evidence, cmd, args=None, spawn=True):
     finally:
         sock.close()
     if not buffer.strip():
-        raise DaemonError("常驻进程无响应（连接被关闭）")
+        raise DaemonError(f"常驻进程无响应：{_log_tail(socket_path(host, port))}")
     return json.loads(buffer.decode())
