@@ -6,6 +6,7 @@
 import os
 import time
 
+import numpy as np
 from PIL import ImageChops
 
 from ocr_locator import normalize
@@ -116,12 +117,13 @@ class ScreenProtocol:
             "error": error,
         }
 
-    def _fail(self, code, message, hint="", **extra):
+    def _fail(self, code, message, hint="", capture=None, **extra):
         if code not in CODES:
             code = "PROTOCOL_ERROR"
+        data = extra.pop("data", None)
         err = {"code": code, "message": message, "hint": hint}
         err.update(extra)
-        return self._envelope(False, error=err)
+        return self._envelope(False, capture=capture, error=err, data=data)
 
     def _save(self, image, tag):
         name = f"{int(time.time() * 1000)}_{tag}.png"
@@ -289,22 +291,64 @@ class ScreenProtocol:
             return self._envelope(True, ref, {"kind": kind, "diff": changed, "changed": changed >= min_diff})
         return self._fail("PROTOCOL_ERROR", f"未知断言 {kind}")
 
-    def settle(self, timeout=8.0, quiet=0.6):
-        """等到画面连续两次快照一致。"""
+    @staticmethod
+    def _changed_ratio(current, previous, region=None):
+        """两张图的差异像素占比（0~1）。region 限定比较范围，降低心跳刷新的干扰。"""
+        def crop(image):
+            return image.crop(tuple(region)) if region else image
+
+        a = np.asarray(crop(current), dtype=np.int16)
+        b = np.asarray(crop(previous), dtype=np.int16)
+        if a.shape != b.shape:
+            return 1.0
+        delta = np.abs(a - b).max(axis=2)
+        return float((delta > 8).sum()) / float(delta.size or 1)
+
+    def settle(self, timeout=8.0, quiet=0.6, region=None, tolerance=0.002):
+        """等到画面稳定。
+
+        稳定判据：与上一帧的差异像素占比 <= tolerance（默认 0.2%），
+        用 region 限定比较范围可以躲开区域外的心跳刷新。
+        超时不再只回 TIMEOUT：回带最后一帧证据与 changedRatio，调用方自行判断。
+        """
         deadline = time.time() + timeout
         prev = None
+        last_ratio = None
         while time.time() < deadline:
             try:
-                image = self.remote.snapshot()
+                image = self.remote.snapshot(region=region)
+            except ValueError as exc:
+                return self._fail("OUT_OF_BOUNDS", str(exc), "region 必须是画面内的 x0,y0,x1,y1")
             except UnsupportedFeature as exc:
                 return self._fail("UNSUPPORTED", str(exc),
                                   "认证需 005-AR；编码类问题请在服务端关闭 Tight/ZRLE 或改用 Raw/CopyRect")
             except OSError as exc:
                 return self._fail("NO_CONNECTION", str(exc), "确认测试台在线且 VNC 端口可达")
-            if prev is not None and image.tobytes() == prev.tobytes():
-                self._last = image
-                ref = self._save(image, "settle")
-                return self._envelope(True, ref, {"stable": True})
+            if prev is not None:
+                last_ratio = self._changed_ratio(image, prev)
+                if last_ratio <= tolerance:
+                    if region is None:
+                        self._last = image
+                    ref = self._save(image, "settle")
+                    return self._envelope(True, ref, {
+                        "stable": True,
+                        "changedRatio": round(last_ratio, 5),
+                        "region": list(region) if region else None,
+                    })
             prev = image
             time.sleep(quiet)
-        return self._fail("TIMEOUT", f"{timeout}s 内画面未稳定", "确认界面没有持续动画或后台刷新")
+        ref = self._save(prev, "settle_timeout") if prev is not None else None
+        if region is None:
+            self._last = prev
+        return self._fail(
+            "TIMEOUT",
+            f"{timeout}s 内画面未稳定（最后差异 {last_ratio if last_ratio is not None else '未知'}，容忍度 {tolerance}）",
+            "用 region 限定关注区域，或调大 tolerance；本包已带最后一帧与 changedRatio",
+            capture=ref,
+            data={
+                "stable": False,
+                "changedRatio": round(last_ratio, 5) if last_ratio is not None else None,
+                "region": list(region) if region else None,
+                "tolerance": tolerance,
+            },
+        )

@@ -86,12 +86,14 @@ class RemoteScreen:
         s.sendall(struct.pack("!BBH", 2, 0, 1) + struct.pack("!i", 0))
         return s, rx
 
-    def _read_frame(self, s, rx):
-        s.sendall(struct.pack("!BBHHHH", 3, 0, 0, 0, self.w, self.h))
-        img = Image.new("RGB", (self.w, self.h))
+    def _read_frame(self, s, rx, rect=None):
+        """rect=(x0,y0,w,h) 只请求该矩形，返回 w×h 的图；缺省整屏。"""
+        x0, y0, fw, fh = rect if rect else (0, 0, self.w, self.h)
+        s.sendall(struct.pack("!BBHHHH", 3, 0, x0, y0, fw, fh))
+        img = Image.new("RGB", (fw, fh))
         rows = 0
         non_zero = 0
-        while rows < self.h:
+        while rows < fh:
             msg = rx(1)[0]
             if msg == 3:
                 rx(3)
@@ -111,24 +113,35 @@ class RemoteScreen:
                     data = rx(w * h * 4)
                     non_zero += sum(1 for b in data if b)
                     tile = Image.frombuffer("RGB", (w, h), data, "raw", "BGRX", 0, 1)
-                    img.paste(tile, (x, y))
+                    img.paste(tile, (x - x0, y - y0))
                 elif enc == 1:  # CopyRect：源矩形取自本帧已绘制区域
                     sx, sy = struct.unpack("!HH", rx(4))
-                    tile = img.crop((sx, sy, sx + w, sy + h))
-                    img.paste(tile, (x, y))
+                    tile = img.crop((sx - x0, sy - y0, sx - x0 + w, sy - y0 + h))
+                    img.paste(tile, (x - x0, y - y0))
                 else:
                     raise UnsupportedEncoding(enc)
                 rows += h
         return img, non_zero
 
-    def snapshot(self, attempts=3):
-        """取当前画面。连接建立后的首帧常为空，需要再请求一次。"""
+    def snapshot(self, attempts=3, region=None):
+        """取当前画面；region=(x0,y0,x1,y1) 时只抓该区域（返回区域大小的图）。
+
+        连接建立后的首帧常为空，需要再请求一次。
+        """
         last = None
+        rect = None
         for _ in range(attempts):
             s, rx = self._connect()
+            if region and rect is None:
+                # 尺寸要等握手完成才知道；_connect 之后 self.w/h 才是真值
+                rx0, ry0, rx1, ry1 = region
+                if not (0 <= rx0 < rx1 <= self.w and 0 <= ry0 < ry1 <= self.h):
+                    s.close()
+                    raise ValueError(f"region {region} 超出 {self.w}x{self.h}")
+                rect = (rx0, ry0, rx1 - rx0, ry1 - ry0)
             try:
                 for _ in range(3):
-                    img, non_zero = self._read_frame(s, rx)
+                    img, non_zero = self._read_frame(s, rx, rect)
                     last = img
                     if non_zero > 0:
                         return img

@@ -53,7 +53,10 @@ def execute(args, host, port, region):
     if args.command == "describe":
         return client.request(host, port, EVIDENCE, "describe", {"region": region})
     if args.command == "settle":
-        return client.request(host, port, EVIDENCE, "settle", {"timeout": args.timeout})
+        return client.request(
+            host, port, EVIDENCE, "settle",
+            {"timeout": args.timeout, "region": region, "tolerance": args.tolerance},
+        )
     if args.command == "verify":
         return client.request(
             host, port, EVIDENCE, "verify",
@@ -80,6 +83,7 @@ def main(argv=None):
     parser.add_argument("--region")
     parser.add_argument("--dy", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=8.0)
+    parser.add_argument("--tolerance", type=float, default=0.002)
     args = parser.parse_args(argv)
 
     try:

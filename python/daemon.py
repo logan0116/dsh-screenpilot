@@ -78,7 +78,12 @@ def _handle(sp, req):
             region=tuple(region) if region else None,
         )
     elif cmd == "settle":
-        result = sp.settle(timeout=args.get("timeout", 8.0))
+        region = args.get("region")
+        result = sp.settle(
+            timeout=args.get("timeout", 8.0),
+            region=tuple(region) if region else None,
+            tolerance=args.get("tolerance", 0.002),
+        )
     elif cmd == "ping":
         result = _envelope(sp, {"alive": True})
     elif cmd in ("stop", "shutdown"):
