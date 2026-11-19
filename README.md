@@ -144,16 +144,20 @@ dsh plugin --profile <profile> add "$PWD"
 
 ## 当前状态
 
-- v0.2.0（2026-11-19）：6 项需求落地——`target` 四级优先级与会话文件、
-  常驻 sidecar 与跨调用帧缓存、`screen_stop`、`verify --kind url`、
-  RFB 编码兼容与错误分类、ASCII 全键位输入与非 ASCII 拒绝；
-  六个工具与实现一一对应，`screen.source`/`pid`/`cost` 可观测；
-- v0.3.0（2026-11-19）：6 项落地——VNC Authentication（安全类型 2）、
-  解释器四级解析与启动日志回传、按键解析健壮性、`describe` 渲染元素清单、
-  `settle` 区域判稳与容差、组合键与输入法路径；并修复 BUG-01（失败信封
-  `capture=null` 被输出校验拦掉）。v0.2.1 未单独发布，内容并入本版；
-- 已知用例耦合：`protocol_selftest.py` 的 12 条按旧台架布局写死坐标，
-  台架画面变化后 P01–P06 会失败；
-- 侧边栏观察窗未做（需要 Client 侧代码）；
-- `web://` 后端未接入；
-- 图标与设置页为占位。
+- v0.5.0（2026-11-20）：Windows 适配四项 + 两个线上 bug
+  - `013-AR` 侧边栏观察窗：host 同源路由 + SSE 推帧，面板内可点击接管（约 1 帧/秒）
+  - `014-AR` `act` 自适应等待：去掉固定 `sleep(1.2)`，单次点击 2.71s → 2.13s
+  - `015-AR` OCR 同帧缓存 + `mode=fast`：同帧 `verify` 1.5s → 0.07s
+  - `016-AR` Windows 传输层回退：无 `AF_UNIX` 时走 `127.0.0.1` 随机端口 + 一次性 token
+  - `017-AR` OCR 预热：daemon 启动即后台加载模型，回包带 `data.ocr_ready`
+  - `018-AR` 剪贴板输入：非 ASCII 文本走 RFB `ClientCutText` + `Ctrl+V`
+  - `019-AR` Windows 文档与 `.venv/Scripts/python.exe` 探测
+  - `BUG-02` 客户端断连不再带崩 daemon；`BUG-03` 中文 Windows 信封不再乱码
+  - `v0.4.0` 未单独发布，内容并入本版
+- 已知限制：
+  - `protocol_selftest.py` 的 12 条按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败；
+  - 单次 `describe` 的精确模式仍约 5 秒（任何减少扫描次数的方案都会丢小字号数字）；
+  - 观察窗约 1 帧/秒，流畅度受 RFB 全帧抓取限制；
+  - `web://` 后端未接入；
+  - Windows 上的传输层与剪贴板粘贴尚未真机验证；
+  - 图标与设置页为占位。

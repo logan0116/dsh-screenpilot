@@ -1,6 +1,6 @@
 {
   "name": "dsh-screenpilot",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "Agent 屏幕驾驶员：把远程测试台与浏览器的屏幕操控封装成 screen_* 工具，附带实时观察窗。",
   "type": "module",
   "main": "./lib/index.js",
