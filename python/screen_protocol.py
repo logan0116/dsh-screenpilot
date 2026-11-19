@@ -10,6 +10,7 @@ from PIL import ImageChops
 
 CODES = (
     "NO_CONNECTION",
+    "NOT_STARTED",
     "UNSTABLE",
     "NOT_FOUND",
     "UNSUPPORTED",

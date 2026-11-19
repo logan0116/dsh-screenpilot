@@ -75,6 +75,15 @@ def save_session(host, port):
     return path
 
 
+def clear_session():
+    """删除会话文件；不存在也算成功。"""
+    try:
+        os.unlink(state_path())
+        return True
+    except FileNotFoundError:
+        return False
+
+
 def resolve(explicit=None, fallback=None):
     """按四级优先级解析目标，返回 (host, port, source)。"""
     if explicit:

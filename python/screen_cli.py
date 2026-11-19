@@ -70,7 +70,8 @@ def execute(args, host, port, region):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="远程屏幕能力 CLI（rsp/2）")
     parser.add_argument("command",
-                        choices=["start", "describe", "act", "verify", "settle", "shutdown", "ping"])
+                        choices=["start", "describe", "act", "verify", "settle",
+                                 "stop", "shutdown", "ping"])
     parser.add_argument("--target", help="vnc://host[:port]，缺省用会话文件或 --default")
     parser.add_argument("--default", help="兜底目标，通常是插件配置的 defaultTarget")
     parser.add_argument("--kind", default="click", help="click/type/key/scroll，或 verify 的断言类型")
@@ -90,8 +91,21 @@ def main(argv=None):
         result = fail("PROTOCOL_ERROR", str(exc), "格式 vnc://host[:port]，端口缺省 5900")
     else:
         try:
-            if args.command in ("shutdown", "ping"):
-                result = client.request(host, port, EVIDENCE, args.command, {})
+            if args.command in ("stop", "shutdown"):
+                result = client.request(host, port, EVIDENCE, "stop", {}, spawn=False)
+                if result is None:
+                    residue = client.socket_path(host, port)
+                    if os.path.exists(residue):
+                        try:
+                            os.unlink(residue)
+                        except OSError:
+                            pass
+                    result = fail("NOT_STARTED", "当前没有会话可释放",
+                                  "先调用 screen_start 建立会话")
+                else:
+                    target_session.clear_session()
+            elif args.command == "ping":
+                result = client.request(host, port, EVIDENCE, "ping", {})
             else:
                 result = execute(args, host, port, region)
             if result.get("screen") is not None and source:

@@ -95,9 +95,17 @@ def ensure(host, port, evidence):
     raise DaemonError(f"常驻进程启动超时（{SPAWN_TIMEOUT}s），见 {path}.log")
 
 
-def request(host, port, evidence, cmd, args=None):
-    """发一个请求，返回信封。连接失败抛 DaemonError。"""
-    sock = ensure(host, port, evidence)
+def request(host, port, evidence, cmd, args=None, spawn=True):
+    """发一个请求，返回信封；连接失败抛 DaemonError。
+
+    spawn=False 时绝不拉起常驻进程，连不上就返回 None（供 stop 使用）。
+    """
+    if spawn:
+        sock = ensure(host, port, evidence)
+    else:
+        sock = _connect(socket_path(host, port))
+        if sock is None:
+            return None
     try:
         payload = json.dumps({"cmd": cmd, "args": args or {}}, ensure_ascii=False)
         sock.sendall(payload.encode() + b"\n")

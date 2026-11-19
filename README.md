@@ -15,7 +15,7 @@ Agent 屏幕驾驶员：把远程屏幕操控封装成 `screen_*` 工具，让 a
 | `screen_act(kind, by, value, region?)` | click / type / key / scroll，按文字或坐标 |
 | `screen_verify(kind, value, region?)` | 断言文本存在、不存在、URL、画面变化 |
 | `screen_settle(timeout?)` | 等画面稳定 |
-| `screen_stop()` | 释放会话（预留） |
+| `screen_stop()` | 释放会话：常驻进程退出、socket 与会话文件清理；无会话时返回 `NOT_STARTED` |
 
 `target` 目前只支持 `vnc://host:port`。`web://url` 后端待接入。
 
@@ -89,6 +89,7 @@ dsh plugin --profile web add /path/to/dsh-screenpilot
 - v0.1.0：VNC 后端可用，六个工具与协议自测 12/12 通过；
 - v0.2.0（进行中）：`target` 真正生效（四级优先级 + 会话文件），`screen.source` 可诊断；
   常驻 sidecar 与跨调用帧缓存已就位（`screen.pid`/`cost` 可观测）；
+  `screen_stop` 已实现，六个工具与实现一一对应；
   协议自测的 12 条用例按旧台架布局写死坐标，台架画面变化后 P01–P06 会失败，属已知的用例耦合；
 - 侧边栏观察窗未做（需要 Client 侧代码）；
 - `web://` 后端未接入；

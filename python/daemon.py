@@ -52,8 +52,8 @@ def handle(sp, req):
         result = sp.settle(timeout=args.get("timeout", 8.0))
     elif cmd == "ping":
         result = _envelope(sp, {"alive": True})
-    elif cmd == "shutdown":
-        result = _envelope(sp, {"shutdown": True})
+    elif cmd in ("stop", "shutdown"):
+        result = _envelope(sp, {"stopped": True})
     else:
         result = sp._fail("PROTOCOL_ERROR", f"未知命令 {cmd!r}", "命令集合：describe/act/verify/settle/ping/shutdown")
 
@@ -98,7 +98,7 @@ def serve(host, port, evidence, sock_path, idle_timeout):
                 result = handle(sp, req)
                 conn.sendall(json.dumps(result, ensure_ascii=False).encode() + b"\n")
             last_active = time.time()
-            if req.get("cmd") == "shutdown":
+            if req.get("cmd") in ("stop", "shutdown"):
                 break
     finally:
         server.close()
