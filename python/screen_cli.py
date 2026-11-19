@@ -51,7 +51,7 @@ def execute(args, host, port, region):
         return result
 
     if args.command == "describe":
-        return client.request(host, port, EVIDENCE, "describe", {"region": region})
+        return client.request(host, port, EVIDENCE, "describe", {"region": region, "mode": args.mode})
     if args.command == "settle":
         return client.request(
             host, port, EVIDENCE, "settle",
@@ -86,6 +86,7 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=8.0)
     parser.add_argument("--tolerance", type=float, default=0.002)
     parser.add_argument("--wait", type=float, default=0.6)
+    parser.add_argument("--mode", default="precise", choices=["precise", "fast"])
     parser.add_argument("--retry-on-no-change", action="store_true")
     args = parser.parse_args(argv)
 

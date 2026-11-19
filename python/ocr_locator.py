@@ -3,6 +3,7 @@
 RapidOCR 返回的坐标就是 framebuffer 像素坐标，可以直接交给
 RemoteScreen.click。region 用来把识别范围限制在局部，减少耗时。
 """
+import hashlib
 import re
 
 import numpy as np
@@ -21,8 +22,13 @@ class TextLocator:
     识别引擎惰性加载：只调 start / settle 的进程不必为 OCR 付初始化成本。
     """
 
-    def __init__(self):
+    def __init__(self, cache_size=2):
         self._engine = None
+        # 同帧缓存：画面没变就不该重复识别。
+        # 键 = 帧内容哈希 + 区域；值 = [(text, cx, cy, score)]
+        self._cache = {}
+        self._cache_order = []
+        self._cache_size = cache_size
 
     @property
     def engine(self):
@@ -31,6 +37,24 @@ class TextLocator:
 
             self._engine = RapidOCR()
         return self._engine
+
+    @staticmethod
+    def frame_key(image, region=None):
+        """帧内容指纹：同一张图 + 同一区域 → 同一键。"""
+        digest = hashlib.blake2b(image.tobytes(), digest_size=12).hexdigest()
+        return (digest, tuple(region) if region else None)
+
+    def cached(self, image, region=None):
+        return self._cache.get(self.frame_key(image, region))
+
+    def remember(self, image, items, region=None):
+        key = self.frame_key(image, region)
+        self._cache[key] = items
+        self._cache_order.append(key)
+        while len(self._cache_order) > self._cache_size:
+            old = self._cache_order.pop(0)
+            self._cache.pop(old, None)
+        return items
 
     def scan(self, image, region=None):
         """识别文字，返回 [(text, cx, cy, score), ...]。
@@ -53,9 +77,10 @@ class TextLocator:
         return items
 
     def find(self, image, needle, region=None, min_score=0.6):
-        """按子串找第一个匹配项，返回 (cx, cy) 或 None。"""
+        """按子串找第一个匹配项，返回 (cx, cy) 或 None。命中同帧缓存时不再识别。"""
         want = normalize(needle)
-        for text, cx, cy, score in self.scan(image, region):
+        items = self.cached(image, region) or self.scan(image, region)
+        for text, cx, cy, score in items:
             if score >= min_score and want in normalize(text):
                 return cx, cy
         return None
@@ -86,7 +111,12 @@ class TextLocator:
             return exact + partial
 
         if region:
-            return match(self.scan(image, region))
+            return match(self.cached(image, region) or self.scan(image, region))
+        cached = self.cached(image)
+        if cached is not None:
+            hits = match(cached)
+            if hits:
+                return hits
         hits = match(self.scan(image))
         if hits:
             return hits

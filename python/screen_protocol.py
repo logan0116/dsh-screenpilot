@@ -184,7 +184,7 @@ class ScreenProtocol:
         image.save(path)
         return name
 
-    def describe(self, region=None, fresh=True):
+    def describe(self, region=None, fresh=True, mode="precise"):
         """取画面并返回文字清单。"""
         try:
             image = self.remote.snapshot()
@@ -198,13 +198,22 @@ class ScreenProtocol:
         ref = self._save(image, "describe")
         self._prev = self._last
         self._last = image
-        items = (
-            self.locator.scan(image, region) if region else self.locator.scan_columns(image)
-        )
+        if region:
+            items = self.locator.scan(image, region)
+        elif mode == "fast":
+            # 整图一次识别：约 1.4 秒，但会漏小字号数字（实测保留约 69%）
+            items = self.locator.scan(image)
+        else:
+            items = self.locator.scan_columns(image)
+        # 把结果挂到这一帧上：后续 act/verify 对同一帧可直接复用，不必再识别一次
+        try:
+            self.locator.remember(image, items, region=region)
+        except (AttributeError, TypeError):
+            pass
         texts = [
             {"text": t, "x": x, "y": y, "score": round(s, 3)} for t, x, y, s in items
         ]
-        return self._envelope(True, ref, {"texts": texts, "region": region})
+        return self._envelope(True, ref, {"texts": texts, "region": region, "mode": mode})
 
     def act(self, kind, text=None, xy=None, region=None, wait=0.6, retry_on_no_change=False, **kwargs):
         """执行一个输入动作，返回动作前后两帧证据。"""

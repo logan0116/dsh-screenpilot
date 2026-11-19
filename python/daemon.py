@@ -61,7 +61,10 @@ def _handle(sp, req):
 
     if cmd == "describe":
         region = args.get("region")
-        result = sp.describe(region=tuple(region) if region else None)
+        result = sp.describe(
+            region=tuple(region) if region else None,
+            mode=args.get("mode", "precise"),
+        )
     elif cmd == "act":
         result = sp.act(
             args.get("kind", "click"),
