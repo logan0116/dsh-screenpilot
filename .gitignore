@@ -7,3 +7,4 @@ evidence/
 .tmp-*/
 .tmp-*.json
 .evidence-test/
+dsh-screenpilot-*.tgz
