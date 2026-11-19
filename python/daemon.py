@@ -24,7 +24,36 @@ def _envelope(sp, data=None, ok=True):
     return {"ok": ok, "seq": sp.seq, "screen": screen, "capture": None, "data": data or {}, "error": None}
 
 
+def _fail_envelope(sp, message, hint=""):
+    """不依赖 sp 状态也能构造的失败信封（sp 本身出错时仍可回包）。"""
+    try:
+        screen = dict(getattr(sp, "meta", {}) or {})
+        remote = getattr(sp, "remote", None)
+        if remote is not None:
+            screen.update({"w": remote.w, "h": remote.h})
+        seq = getattr(sp, "seq", 0)
+    except Exception:  # noqa: BLE001 - 兜底路径，取不到就回最小信封
+        screen, seq = {}, 0
+    return {"ok": False, "seq": seq, "screen": screen, "capture": None,
+            "data": {}, "error": {"code": "PROTOCOL_ERROR", "message": message, "hint": hint}}
+
+
 def handle(sp, req):
+    """执行一个请求，返回信封；任何异常都转成 PROTOCOL_ERROR，不拖垮常驻进程。"""
+    try:
+        return _handle(sp, req)
+    except Exception as exc:  # noqa: BLE001 - 单请求失败不能终止 daemon
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        return _fail_envelope(
+            sp,
+            f"{type(exc).__name__}: {exc}",
+            "请求参数或状态异常；进程仍存活，可修正参数后重试",
+        )
+
+
+def _handle(sp, req):
     """执行一个请求，返回信封。未知命令按 PROTOCOL_ERROR 处理。"""
     cmd = req.get("cmd")
     args = req.get("args") or {}

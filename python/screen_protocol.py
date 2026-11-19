@@ -42,6 +42,55 @@ KEYSYM = {
 }
 
 
+# 按键别名：不同协议/人性化写法归一到 KEYSYM 的规范名。
+# 只做名字归一化，不改 keysym 值；规范名本身仍以 KEYSYM 为唯一真相。
+KEY_ALIASES = {
+    "escape": "esc",
+    "return": "enter",
+    "enter_key": "enter",
+    "page_up": "pageup",
+    "page-up": "pageup",
+    "page_down": "pagedown",
+    "page-down": "pagedown",
+    "pgup": "pageup",
+    "pgdn": "pagedown",
+    "del": "delete",
+    "ins": "insert",
+    "spacebar": "space",
+    "arrowup": "up",
+    "arrowdown": "down",
+    "arrowleft": "left",
+    "arrowright": "right",
+    "up_arrow": "up",
+    "down_arrow": "down",
+    "left_arrow": "left",
+    "right_arrow": "right",
+}
+
+
+def resolve_keysym(name):
+    """把按键名解析成 keysym；无法识别返回 None（调用方负责报 PROTOCOL_ERROR）。
+
+    规则：先小写去空白 → 别名归一 → KEYSYM 查表 → 单字符可打印 ASCII 取码位。
+    """
+    if not isinstance(name, str):
+        return None
+    key = name.strip().lower()
+    if not key:
+        return None
+    key = KEY_ALIASES.get(key, key)
+    if key in KEYSYM:
+        return KEYSYM[key]
+    if len(key) == 1 and 0x20 <= ord(key) <= 0x7E:
+        return ord(key)
+    return None
+
+
+def supported_key_names():
+    """给错误提示用的按键名清单（规范名，排序后返回）。"""
+    return ", ".join(sorted(KEYSYM))
+
+
 class ScreenProtocol:
     """把 RemoteScreen 和 TextLocator 包成协议化的调用。"""
 
@@ -155,7 +204,14 @@ class ScreenProtocol:
             elif kind == "type":
                 self.remote.type_text(text or "")
             elif kind == "key":
-                self.remote.tap(KEYSYM[(text or "").lower()])
+                keysym = resolve_keysym(text)
+                if keysym is None:
+                    return self._fail(
+                        "PROTOCOL_ERROR",
+                        f"不支持的按键 {text!r}",
+                        f"可用按键：{supported_key_names()}；也支持单个可打印 ASCII 字符",
+                    )
+                self.remote.tap(keysym)
             elif kind == "scroll":
                 dy = kwargs.get("dy", 0)
                 cx = target["x"] if target else self.remote.w // 2
