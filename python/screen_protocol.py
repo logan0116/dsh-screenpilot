@@ -32,6 +32,12 @@ KEYSYM = {
     "left": 0xFF51,
     "right": 0xFF53,
     "f5": 0xFFC2,
+    "f1": 0xFFBE, "f2": 0xFFBF, "f3": 0xFFC0, "f4": 0xFFC1,
+    "f6": 0xFFC3, "f7": 0xFFC4, "f8": 0xFFC5, "f9": 0xFFC6,
+    "f10": 0xFFC7, "f11": 0xFFC8, "f12": 0xFFC9,
+    "home": 0xFF50, "end": 0xFF57, "insert": 0xFF63, "delete": 0xFF9F,
+    "pageup": 0xFF55, "pagedown": 0xFF56, "space": 0x20,
+    "ctrl": 0xFFE3, "alt": 0xFFE9, "shift": 0xFFE1,
 }
 
 
@@ -125,6 +131,16 @@ class ScreenProtocol:
                 "OUT_OF_BOUNDS",
                 f"坐标 ({target['x']},{target['y']}) 超出 {self.remote.w}x{self.remote.h}",
             )
+
+        if kind == "type":
+            bad = next((c for c in (text or "") if (ord(c) > 0x7E or ord(c) < 0x20)
+                        and c not in "\n\t"), None)
+            if bad is not None:
+                return self._fail(
+                    "UNSUPPORTED",
+                    f"非 ASCII 字符 {bad!r} (U+{ord(bad):04X}) 无法输入",
+                    "当前输入通道只支持 ASCII；中文等需剪贴板注入（另立需求）",
+                )
 
         try:
             if kind == "click":

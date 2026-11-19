@@ -10,18 +10,19 @@ import time
 
 from PIL import Image
 
-KEYSYM = {
-    "\n": 0xFF0D,
-    " ": 0x20,
-    "/": 0x2F,
-    ".": 0x2E,
-    "-": 0x2D,
-    "\\": 0x5C,
-    "_": 0x5F,
-    ":": 0x3A,
-    "=": 0x3D,
+# ASCII 可打印区：X11 keysym 等于码位，可直接发送；下列符号在 US 布局上需要 Shift
+SHIFTED = {
+    "!": 0x31, "@": 0x32, "#": 0x33, "$": 0x34, "%": 0x35, "^": 0x36,
+    "&": 0x37, "*": 0x38, "(": 0x39, ")": 0x30, "_": 0x2D, "+": 0x3D,
+    "{": 0x5B, "}": 0x5D, "|": 0x5C, ":": 0x3B, '"': 0x27,
+    "<": 0x2C, ">": 0x2E, "?": 0x2F, "~": 0x60,
 }
+CONTROL = {"\n": 0xFF0D, "\t": 0xFF09}
 SHIFT = 0xFFE1
+
+
+class UnsupportedChar(ValueError):
+    """非 ASCII（或控制符）字符，当前输入通道无法表达。"""
 
 
 class RemoteScreen:
@@ -154,9 +155,18 @@ class RemoteScreen:
         self._run(action)
 
     def type_text(self, text):
+        """按 US 布局逐字符输入。整串先校验：非 ASCII 直接抛 UnsupportedChar，绝不发半个词。"""
+        bad = next((c for c in text
+                    if (ord(c) > 0x7E or ord(c) < 0x20) and c not in CONTROL), None)
+        if bad is not None:
+            raise UnsupportedChar(f"{bad!r} (U+{ord(bad):04X})")
         for ch in text:
-            if ch in KEYSYM:
-                self.tap(KEYSYM[ch])
+            if ch in CONTROL:
+                self.tap(CONTROL[ch])
+            elif ord(ch) > 0x7E or ord(ch) < 0x20:
+                raise UnsupportedChar(f"{ch!r} (U+{ord(ch):04X})")
+            elif ch in SHIFTED:
+                self._shifted(SHIFTED[ch])
             elif ch.isupper():
                 self._shifted(ord(ch.lower()))
             else:
